@@ -1,0 +1,204 @@
+<div class="view active" id="view-overview">
+  <section class="metrics">
+    <div class="metric"><div class="label">Lead attivi</div><div class="value" id="ov-totalLeads">-</div></div>
+    <div class="metric"><div class="label">Score medio</div><div class="value" id="ov-averageScore">-</div></div>
+    <div class="metric"><div class="label">Priorita A</div><div class="value" id="ov-priorityA">-</div></div>
+    <div class="metric"><div class="label">Interessati</div><div class="value" id="ov-interested">-</div></div>
+  </section>
+
+  <section class="grid">
+    <div class="stack">
+      <div class="panel">
+        <h2>Impostazioni ricerca settimanale</h2>
+        <div class="fields">
+          <div><label for="ov-week">Settimana</label><input id="ov-week" placeholder="2026-W27"></div>
+          <div><label for="ov-leadCount">Numero lead richiesti</label><input id="ov-leadCount" type="number" min="1" max="500" value="100"></div>
+          <div><label for="ov-territory">Territorio prioritario</label><input id="ov-territory" placeholder="Monza Brianza, Milano, Lombardia"></div>
+          <div><label for="ov-sector">Settore merceologico</label><input id="ov-sector" placeholder="Food, banking, healthcare, HR..."></div>
+          <div>
+            <label for="ov-focus">Focus commerciale</label>
+            <select id="ov-focus">
+              <option>Nuovi sponsor</option><option>Hospitality</option><option>CSR</option>
+              <option>Giovani e territorio</option><option>Brand awareness</option><option>Networking B2B</option>
+              <option>Employer branding</option><option>Eventi</option>
+            </select>
+          </div>
+          <div><label for="ov-includeCompanies">Aziende da includere</label><input id="ov-includeCompanies" placeholder="Una o piu aziende, separate da virgole"></div>
+          <div><label for="ov-excludeCompanies">Aziende da escludere</label><input id="ov-excludeCompanies" placeholder="Competitor, blacklist, esclusioni"></div>
+          <div class="full"><label for="ov-notes">Note aggiuntive</label><textarea id="ov-notes" placeholder="Indicazioni operative per questa settimana"></textarea></div>
+        </div>
+        <div class="actions">
+          <button class="secondary" onclick="ovClearForm()">Pulisci</button>
+          <button class="primary" onclick="ovSaveSettings()">Salva impostazioni</button>
+        </div>
+        <div class="status" id="ov-formStatus"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Ultime impostazioni salvate</h2>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Settimana</th><th>Territorio</th><th>Settore</th><th>Focus</th></tr></thead>
+          <tbody id="ov-settingsTable"></tbody>
+        </table></div>
+      </div>
+
+      <div class="panel">
+        <h2>Manutenzione automazioni</h2>
+        <p class="sub">Esegui manualmente l'archiviazione settimanale e il promemoria, oppure (re)installa i trigger automatici (ogni lunedi alle 7 + sincronizzazione stato lead).</p>
+        <div class="actions" style="justify-content:flex-start">
+          <button class="secondary" onclick="ovRunMaintenance()">Esegui manutenzione ora</button>
+          <button class="secondary" onclick="ovInstallTriggers()">Installa/ripristina trigger</button>
+          <button class="secondary" onclick="ovRecalculateScores()">Ricalcola tutti gli score</button>
+        </div>
+        <div class="status" id="ov-maintenanceStatus"></div>
+      </div>
+    </div>
+
+    <aside class="stack">
+      <div class="panel">
+        <h2>Funnel commerciale</h2>
+        <div id="ov-funnel"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Monitoraggio lead attivi</h2>
+        <div id="ov-statusPills"></div>
+        <div id="ov-priorityBars"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Settori principali</h2>
+        <div id="ov-sectorBars"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Log recenti</h2>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Data</th><th>Operazione</th><th>Stato</th></tr></thead>
+          <tbody id="ov-logTable"></tbody>
+        </table></div>
+      </div>
+    </aside>
+  </section>
+</div>
+
+<script>
+  function renderOverview(data) {
+    document.getElementById('subtitle').textContent = 'Settimana ' + data.week + ' - aggiornato ' + data.now;
+    document.getElementById('ov-totalLeads').textContent = data.metrics.totalLeads;
+    document.getElementById('ov-averageScore').textContent = data.metrics.averageScore;
+    document.getElementById('ov-priorityA').textContent = data.metrics.priorityA;
+    document.getElementById('ov-interested').textContent = data.metrics.interested;
+
+    ovHydrateForm(data);
+    ovRenderSettings(data.recentSettings || []);
+    ovRenderPills(data.metrics.status || {});
+    ovRenderBars('ov-priorityBars', data.metrics.priority || {});
+    ovRenderTopBars('ov-sectorBars', data.metrics.sectors || []);
+    ovRenderLogs(data.recentLogs || []);
+    ovRenderFunnel(data.funnel || []);
+  }
+
+  function ovHydrateForm(data) {
+    const latest = data.settings || {};
+    document.getElementById('ov-week').value = latest['Settimana'] || data.week;
+    document.getElementById('ov-territory').value = latest['Territorio Prioritario'] || '';
+    document.getElementById('ov-sector').value = latest['Settore Merceologico'] || '';
+    document.getElementById('ov-includeCompanies').value = latest['Aziende Specifiche Da Includere'] || '';
+    document.getElementById('ov-excludeCompanies').value = latest['Aziende Da Escludere'] || '';
+    document.getElementById('ov-focus').value = latest['Focus Commerciale'] || 'Nuovi sponsor';
+    document.getElementById('ov-leadCount').value = latest['Numero Lead Richiesti'] || 100;
+    document.getElementById('ov-notes').value = latest['Note Aggiuntive'] || '';
+  }
+
+  function ovSaveSettings() {
+    const payload = {
+      week: document.getElementById('ov-week').value.trim(),
+      territory: document.getElementById('ov-territory').value.trim(),
+      sector: document.getElementById('ov-sector').value.trim(),
+      includeCompanies: document.getElementById('ov-includeCompanies').value.trim(),
+      excludeCompanies: document.getElementById('ov-excludeCompanies').value.trim(),
+      focus: document.getElementById('ov-focus').value,
+      leadCount: document.getElementById('ov-leadCount').value || 100,
+      notes: document.getElementById('ov-notes').value.trim()
+    };
+    setStatus('ov-formStatus', 'Salvataggio impostazioni...');
+    apiCall('saveWeeklySettings', payload)
+      .then(data => { state = data; renderOverview(data); setStatus('ov-formStatus', 'Impostazioni salvate.', 'ok'); })
+      .catch(err => setStatus('ov-formStatus', err.message, 'error'));
+  }
+
+  function ovClearForm() {
+    ['ov-territory', 'ov-sector', 'ov-includeCompanies', 'ov-excludeCompanies', 'ov-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('ov-leadCount').value = 100;
+    document.getElementById('ov-focus').value = 'Nuovi sponsor';
+    setStatus('ov-formStatus', 'Campi puliti.');
+  }
+
+  function ovRunMaintenance() {
+    setStatus('ov-maintenanceStatus', 'Esecuzione in corso...');
+    apiCall('runWeeklyMaintenanceNow')
+      .then(data => { state = data; renderOverview(data); setStatus('ov-maintenanceStatus', 'Manutenzione completata.', 'ok'); })
+      .catch(err => setStatus('ov-maintenanceStatus', err.message, 'error'));
+  }
+
+  function ovInstallTriggers() {
+    setStatus('ov-maintenanceStatus', 'Installazione trigger...');
+    apiCall('installAutomationTriggers')
+      .then(() => setStatus('ov-maintenanceStatus', 'Trigger installati/aggiornati.', 'ok'))
+      .catch(err => setStatus('ov-maintenanceStatus', err.message, 'error'));
+  }
+
+  function ovRecalculateScores() {
+    setStatus('ov-maintenanceStatus', 'Ricalcolo score in corso...');
+    apiCall('recalculateScores')
+      .then(res => { setStatus('ov-maintenanceStatus', res.recalculated + ' lead ricalcolati.', 'ok'); refreshAll(); })
+      .catch(err => setStatus('ov-maintenanceStatus', err.message, 'error'));
+  }
+
+  function ovRenderSettings(rows) {
+    document.getElementById('ov-settingsTable').innerHTML = rows.map(row => `
+      <tr>
+        <td>${escapeHtml(row['Settimana'])}</td>
+        <td>${escapeHtml(row['Territorio Prioritario'])}</td>
+        <td>${escapeHtml(row['Settore Merceologico'])}</td>
+        <td>${escapeHtml(row['Focus Commerciale'])}</td>
+      </tr>`).join('') || '<tr><td colspan="4">Nessuna impostazione salvata.</td></tr>';
+  }
+
+  function ovRenderPills(items) {
+    const keys = Object.keys(items);
+    document.getElementById('ov-statusPills').innerHTML = keys.length
+      ? keys.map(key => `<span class="pill">${escapeHtml(key)}: ${items[key]}</span>`).join('')
+      : '<span class="pill">Nessun dato lead</span>';
+  }
+
+  function ovRenderBars(id, items) {
+    ovRenderTopBars(id, Object.keys(items).map(key => ({ name: key, value: items[key] })));
+  }
+
+  function ovRenderTopBars(id, items) {
+    const el = document.getElementById(id);
+    const max = Math.max(1, ...items.map(item => item.value));
+    el.innerHTML = items.length ? items.map(item => `
+      <div style="margin-bottom:10px">
+        <div class="sub">${escapeHtml(item.name)} (${item.value})</div>
+        <div class="bar"><div class="fill" style="width:${Math.round((item.value / max) * 100)}%"></div></div>
+      </div>`).join('') : '<div class="sub">Nessun dato disponibile.</div>';
+  }
+
+  function ovRenderLogs(rows) {
+    document.getElementById('ov-logTable').innerHTML = rows.map(row => `
+      <tr><td>${escapeHtml(row['Data Esecuzione'])}</td><td>${escapeHtml(row['Tipo Operazione'])}</td><td>${escapeHtml(row['Stato Esecuzione'])}</td></tr>
+    `).join('') || '<tr><td colspan="3">Nessun log presente.</td></tr>';
+  }
+
+  function ovRenderFunnel(stages) {
+    const max = Math.max(1, ...stages.map(s => s.valore));
+    document.getElementById('ov-funnel').innerHTML = stages.map(s => `
+      <div style="margin-bottom:10px">
+        <div class="sub">${escapeHtml(s.stadio)} (${s.valore})</div>
+        <div class="bar"><div class="fill" style="width:${Math.round((s.valore / max) * 100)}%"></div></div>
+      </div>`).join('');
+  }
+</script>

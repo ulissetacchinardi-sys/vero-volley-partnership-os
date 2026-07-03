@@ -1,0 +1,188 @@
+<div class="view" id="view-leadweekly">
+  <div class="panel">
+    <h2>Importa nuovi lead candidati</h2>
+    <p class="sub">Incolla una riga per persona, campi separati da TAB (copia/incolla diretto da un foglio), nell'ordine:
+      Nome, Cognome, Job Title, Azienda, Settore, Sede, Provincia, Regione, Dimensione Azienda (1-10/11-50/51-200/200+),
+      Fatturato Stimato, LinkedIn URL, Sito Web Azienda, Fonte. Territorio e Settore Richiesto vengono presi automaticamente
+      dalle impostazioni della settimana attiva. Ogni riga passa subito da deduplica, controllo blacklist e scoring automatico.</p>
+    <textarea id="lw-batchInput" class="mono full" placeholder="Mario&#9;Rossi&#9;Marketing Manager&#9;Acme Spa&#9;Manifattura&#9;Monza&#9;MB&#9;Lombardia&#9;51-200&#9;5000000&#9;https://linkedin.com/in/...&#9;https://acme.it&#9;LinkedIn"></textarea>
+    <div class="actions">
+      <button class="secondary" onclick="lwClearBatch()">Pulisci</button>
+      <button class="primary" onclick="lwImportBatch()">Valuta e importa</button>
+    </div>
+    <div class="status" id="lw-importStatus"></div>
+  </div>
+
+  <div class="panel" style="margin-top:18px">
+    <h2>Aggiungi un singolo lead</h2>
+    <div class="fields cols-4">
+      <div><label>Nome</label><input id="lw-nome"></div>
+      <div><label>Cognome</label><input id="lw-cognome"></div>
+      <div><label>Job Title</label><input id="lw-jobTitle"></div>
+      <div><label>Azienda</label><input id="lw-azienda"></div>
+      <div><label>Settore</label><input id="lw-settore"></div>
+      <div><label>Sede</label><input id="lw-sede"></div>
+      <div><label>Provincia</label><input id="lw-provincia"></div>
+      <div><label>Regione</label><input id="lw-regione"></div>
+      <div>
+        <label>Dimensione Azienda</label>
+        <select id="lw-dimensione"><option value="">-</option><option>1-10</option><option>11-50</option><option>51-200</option><option>200+</option></select>
+      </div>
+      <div><label>Fatturato Stimato</label><input id="lw-fatturato" placeholder="5.000.000 o 5 mln"></div>
+      <div><label>LinkedIn URL</label><input id="lw-linkedin"></div>
+      <div><label>Sito Web Azienda</label><input id="lw-sito"></div>
+    </div>
+    <div class="actions">
+      <button class="primary" onclick="lwAddSingle()">Valuta e aggiungi</button>
+    </div>
+    <div class="status" id="lw-singleStatus"></div>
+  </div>
+
+  <div class="panel" style="margin-top:18px">
+    <h2>Lead attivi</h2>
+    <div class="filters">
+      <div><label>Priorita</label><select id="lw-fPriorita" onchange="loadLeadWeekly()">
+        <option value="">Tutte</option><option>A - Alta</option><option>B - Media</option><option>C - Bassa</option><option>Escludere</option>
+      </select></div>
+      <div><label>Stato</label><select id="lw-fStato" onchange="loadLeadWeekly()">
+        <option value="">Tutti</option><option>Nuovo</option><option>Da validare</option><option>Validato</option><option>Contattato</option>
+        <option>Risposto</option><option>Interessato</option><option>Non interessato</option><option>Da non contattare</option>
+        <option>Duplicato</option><option>Archiviato</option>
+      </select></div>
+      <div><label>Settore contiene</label><input id="lw-fSettore" oninput="lwDebouncedReload()"></div>
+      <div><label>Territorio contiene</label><input id="lw-fTerritorio" oninput="lwDebouncedReload()"></div>
+    </div>
+    <div class="status" id="lw-status"></div>
+    <div class="table-scroll"><table>
+      <thead><tr>
+        <th>Priorita</th><th>Nome</th><th>Azienda</th><th>Settore</th><th>Sede</th><th>Score</th>
+        <th>Stato</th><th>Owner</th><th>Azioni</th>
+      </tr></thead>
+      <tbody id="lw-table"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<script>
+  const STATO_LEAD_OPTIONS = ['Nuovo', 'Da validare', 'Validato', 'Contattato', 'Risposto', 'Interessato', 'Non interessato', 'Da non contattare', 'Duplicato', 'Archiviato'];
+  const BATCH_FIELDS = ['nome', 'cognome', 'jobTitle', 'azienda', 'settore', 'sede', 'provincia', 'regione', 'dimensioneAzienda', 'fatturatoStimato', 'linkedinUrl', 'sitoWebAzienda', 'fonte'];
+  let lwReloadTimer = null;
+
+  function lwDebouncedReload() {
+    clearTimeout(lwReloadTimer);
+    lwReloadTimer = setTimeout(loadLeadWeekly, 400);
+  }
+
+  function loadLeadWeekly() {
+    const filters = {
+      priorita: document.getElementById('lw-fPriorita').value,
+      stato: document.getElementById('lw-fStato').value,
+      settore: document.getElementById('lw-fSettore').value.trim(),
+      territorio: document.getElementById('lw-fTerritorio').value.trim()
+    };
+    setStatus('lw-status', 'Caricamento lead...');
+    apiCall('getLeadWeeklyView', filters)
+      .then(rows => { renderLeadWeekly(rows); setStatus('lw-status', rows.length + ' lead trovati.'); })
+      .catch(err => setStatus('lw-status', err.message, 'error'));
+  }
+
+  function renderLeadWeekly(rows) {
+    document.getElementById('lw-table').innerHTML = rows.map(r => `
+      <tr>
+        <td><span class="pill ${priorityClass(r['Priorita'])}">${escapeHtml(r['Priorita'])}</span></td>
+        <td class="clickable" onclick="openEntityDetail('persona', '${escapeHtml(r['ID Persona'])}')">${escapeHtml(r['Nome'])} ${escapeHtml(r['Cognome'])}<div class="sub">${escapeHtml(r['Job Title'])}</div></td>
+        <td class="clickable" onclick="openEntityDetail('azienda', '${escapeHtml(r['ID Azienda'])}')">${escapeHtml(r['Azienda'])}</td>
+        <td>${escapeHtml(r['Settore'])}</td>
+        <td>${escapeHtml(r['Sede Azienda'])}</td>
+        <td>${escapeHtml(r['Sponsor Fit Score'])}</td>
+        <td><select onchange="lwChangeStatus('${escapeHtml(r['ID Lead'])}', this.value)">
+          ${STATO_LEAD_OPTIONS.map(s => `<option value="${s}" ${s === r['Stato'] ? 'selected' : ''}>${s}</option>`).join('')}
+        </select></td>
+        <td>${escapeHtml(r['Owner'])}</td>
+        <td>
+          <button class="secondary" onclick="lwOpenTrattativa('${escapeHtml(r['ID Lead'])}')">Trattativa</button>
+          <button class="secondary" onclick="lwSendEmail('${escapeHtml(r['ID Persona'])}', '${escapeHtml(r['Nome'])}')">Email</button>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="9">Nessun lead corrisponde ai filtri.</td></tr>';
+  }
+
+  function lwChangeStatus(leadId, newStatus) {
+    setStatus('lw-status', 'Aggiornamento stato...');
+    apiCall('updateLeadStatus', leadId, newStatus)
+      .then(rows => { renderLeadWeekly(rows); setStatus('lw-status', 'Stato aggiornato.', 'ok'); })
+      .catch(err => setStatus('lw-status', err.message, 'error'));
+  }
+
+  function lwOpenTrattativa(leadId) {
+    const valore = window.prompt('Valore stimato della trattativa (EUR)?', '0');
+    if (valore === null) return;
+    const tipo = window.prompt('Tipo opportunita? (Sponsorship, Hospitality, CSR, Giovani e territorio, Networking B2B, Employer branding, Eventi, Brand awareness)', 'Sponsorship');
+    if (tipo === null) return;
+    setStatus('lw-status', 'Apertura trattativa...');
+    apiCall('createTrattativa', { leadId: leadId, valoreStimato: valore, tipoOpportunita: tipo })
+      .then(() => { setStatus('lw-status', 'Trattativa aperta in Pipeline.', 'ok'); loadLeadWeekly(); })
+      .catch(err => setStatus('lw-status', err.message, 'error'));
+  }
+
+  function lwSendEmail(personaId, nome) {
+    const email = window.prompt('Indirizzo email per ' + nome + '?');
+    if (!email) return;
+    setStatus('lw-status', 'Invio email in corso...');
+    apiCall('sendOutreachEmail', { personaId: personaId, templateKey: 'primoContatto', email: email })
+      .then(() => { setStatus('lw-status', 'Email inviata e registrata nello storico.', 'ok'); loadLeadWeekly(); })
+      .catch(err => setStatus('lw-status', err.message, 'error'));
+  }
+
+  function lwClearBatch() {
+    document.getElementById('lw-batchInput').value = '';
+    setStatus('lw-importStatus', '');
+  }
+
+  function lwImportBatch() {
+    const text = document.getElementById('lw-batchInput').value;
+    const leads = text.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+      const cols = line.split('\t');
+      const obj = {};
+      BATCH_FIELDS.forEach((f, i) => obj[f] = (cols[i] || '').trim());
+      return obj;
+    });
+    if (!leads.length) { setStatus('lw-importStatus', 'Incolla almeno una riga.', 'error'); return; }
+    setStatus('lw-importStatus', 'Valutazione di ' + leads.length + ' lead in corso...');
+    apiCall('importLeadBatch', { leads: leads })
+      .then(res => {
+        setStatus('lw-importStatus', res.generated + ' accettati, ' + res.rejected + ' scartati su ' + res.total + ' candidati.', 'ok');
+        document.getElementById('lw-batchInput').value = '';
+        renderLeadWeekly(res.view);
+      })
+      .catch(err => setStatus('lw-importStatus', err.message, 'error'));
+  }
+
+  function lwAddSingle() {
+    const payload = {
+      nome: document.getElementById('lw-nome').value.trim(), cognome: document.getElementById('lw-cognome').value.trim(),
+      jobTitle: document.getElementById('lw-jobTitle').value.trim(), azienda: document.getElementById('lw-azienda').value.trim(),
+      settore: document.getElementById('lw-settore').value.trim(), sede: document.getElementById('lw-sede').value.trim(),
+      provincia: document.getElementById('lw-provincia').value.trim(), regione: document.getElementById('lw-regione').value.trim(),
+      dimensioneAzienda: document.getElementById('lw-dimensione').value, fatturatoStimato: document.getElementById('lw-fatturato').value.trim(),
+      linkedinUrl: document.getElementById('lw-linkedin').value.trim(), sitoWebAzienda: document.getElementById('lw-sito').value.trim(),
+      territorioRichiesto: (state && state.settings && state.settings['Territorio Prioritario']) || '',
+      settoreRichiesto: (state && state.settings && state.settings['Settore Merceologico']) || ''
+    };
+    if (!payload.nome || !payload.cognome || !payload.azienda) {
+      setStatus('lw-singleStatus', 'Nome, cognome e azienda sono obbligatori.', 'error');
+      return;
+    }
+    setStatus('lw-singleStatus', 'Valutazione in corso...');
+    apiCall('addSingleLead', payload)
+      .then(res => {
+        setStatus('lw-singleStatus', res.accepted ? 'Lead aggiunto.' : ('Scartato: ' + res.reason), res.accepted ? 'ok' : 'error');
+        if (res.accepted) {
+          ['lw-nome','lw-cognome','lw-jobTitle','lw-azienda','lw-settore','lw-sede','lw-provincia','lw-regione','lw-fatturato','lw-linkedin','lw-sito']
+            .forEach(id => document.getElementById(id).value = '');
+          document.getElementById('lw-dimensione').value = '';
+        }
+        renderLeadWeekly(res.view);
+      })
+      .catch(err => setStatus('lw-singleStatus', err.message, 'error'));
+  }
+</script>

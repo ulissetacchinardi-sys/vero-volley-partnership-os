@@ -1,0 +1,67 @@
+<div class="view" id="view-pipeline">
+  <div class="panel">
+    <h2>Pipeline trattative (trascina le card tra le fasi)</h2>
+    <div class="status" id="pl-status"></div>
+    <div class="board" id="pl-board"></div>
+  </div>
+</div>
+
+<script>
+  const FASI_TRATTATIVA = ['Primo contatto', 'Qualifica', 'Proposta inviata', 'Negoziazione', 'Chiusura vinta', 'Chiusura persa', 'Stand by'];
+  let plDragId = null;
+
+  function loadPipeline() {
+    setStatus('pl-status', 'Caricamento pipeline...');
+    apiCall('getPipelineBoard')
+      .then(board => { renderPipeline(board); setStatus('pl-status', ''); })
+      .catch(err => setStatus('pl-status', err.message, 'error'));
+  }
+
+  function renderPipeline(board) {
+    const byFase = {};
+    board.forEach(col => byFase[col.fase] = col);
+
+    document.getElementById('pl-board').innerHTML = FASI_TRATTATIVA.map(fase => {
+      const col = byFase[fase] || { fase: fase, valoreTotale: 0, trattative: [] };
+      const cards = col.trattative.map(t => `
+        <div class="kcard" draggable="true" ondragstart="plDragStart(event, '${escapeHtml(t['ID Trattativa'])}')" onclick="openEntityDetail('azienda', '${escapeHtml(t['ID Azienda'])}')">
+          <b>${escapeHtml(t['Azienda'])}</b>
+          <div>${escapeHtml(t['Contatto Principale'])}</div>
+          <div class="kmeta">${escapeHtml(t['Valore Stimato'] || '0')} EUR - ${escapeHtml(t['Probabilita'] || '?')}%</div>
+          <div class="kmeta">Owner: ${escapeHtml(t['Owner'] || '-')}</div>
+        </div>`).join('');
+
+      return `
+        <div class="kcol" data-fase="${escapeHtml(fase)}" ondragover="plDragOver(event)" ondragleave="plDragLeave(event)" ondrop="plDrop(event, '${escapeHtml(fase)}')">
+          <h3>${escapeHtml(fase)} (${col.trattative.length})</h3>
+          <div class="kvalue">${col.valoreTotale} EUR</div>
+          ${cards}
+        </div>`;
+    }).join('');
+  }
+
+  function plDragStart(event, trattativaId) {
+    plDragId = trattativaId;
+    event.dataTransfer.setData('text/plain', trattativaId);
+  }
+
+  function plDragOver(event) {
+    event.preventDefault();
+    event.currentTarget.classList.add('dragover');
+  }
+
+  function plDragLeave(event) {
+    event.currentTarget.classList.remove('dragover');
+  }
+
+  function plDrop(event, nuovaFase) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('dragover');
+    const trattativaId = event.dataTransfer.getData('text/plain') || plDragId;
+    if (!trattativaId) return;
+    setStatus('pl-status', 'Aggiornamento fase...');
+    apiCall('moveTrattativa', { trattativaId: trattativaId, nuovaFase: nuovaFase })
+      .then(board => { renderPipeline(board); setStatus('pl-status', 'Trattativa aggiornata.', 'ok'); })
+      .catch(err => setStatus('pl-status', err.message, 'error'));
+  }
+</script>

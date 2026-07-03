@@ -1,0 +1,92 @@
+<div class="view" id="view-aziende">
+  <div class="panel">
+    <h2>Cerca aziende e contatti</h2>
+    <input id="az-query" placeholder="Cerca per nome azienda, nome o cognome..." oninput="azDebouncedSearch()">
+    <div class="status" id="az-status"></div>
+
+    <div class="grid" style="margin-top:14px">
+      <div class="panel">
+        <h3>Aziende</h3>
+        <div id="az-companies"></div>
+      </div>
+      <div class="panel">
+        <h3>Persone</h3>
+        <div id="az-people"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:18px">
+    <h2>Pianifica follow-up</h2>
+    <p class="sub">Seleziona un'azienda o una persona dai risultati sopra (click su "Pianifica follow-up" nella riga), poi imposta data e promemoria: verra' creato un evento sul tuo Google Calendar e la Data Follow Up del record verra' aggiornata di conseguenza.</p>
+    <div id="az-selected" class="sub">Nessuna entita selezionata.</div>
+    <div class="fields">
+      <div><label>Data e ora follow-up</label><input id="az-fuDate" type="datetime-local"></div>
+      <div><label>Titolo evento</label><input id="az-fuTitle" placeholder="Follow-up sponsorizzazione"></div>
+      <div class="full"><label>Dettagli</label><textarea id="az-fuDetails"></textarea></div>
+    </div>
+    <div class="actions">
+      <button class="primary" onclick="azScheduleFollowUp()">Crea promemoria</button>
+    </div>
+    <div class="status" id="az-fuStatus"></div>
+  </div>
+</div>
+
+<script>
+  let azSelected = null;
+  let azSearchTimer = null;
+
+  function azDebouncedSearch() {
+    clearTimeout(azSearchTimer);
+    azSearchTimer = setTimeout(azSearch, 350);
+  }
+
+  function azSearch() {
+    const query = document.getElementById('az-query').value.trim();
+    if (!query) {
+      document.getElementById('az-companies').innerHTML = '';
+      document.getElementById('az-people').innerHTML = '';
+      return;
+    }
+    setStatus('az-status', 'Ricerca in corso...');
+    apiCall('searchEntities', query)
+      .then(result => { renderSearchResults(result); setStatus('az-status', ''); })
+      .catch(err => setStatus('az-status', err.message, 'error'));
+  }
+
+  function renderSearchResults(result) {
+    document.getElementById('az-companies').innerHTML = (result.aziende || []).map(r => `
+      <div class="kcard" style="cursor:default">
+        <b class="clickable" onclick="openEntityDetail('azienda', '${escapeHtml(r['ID Azienda'])}')">${escapeHtml(r['Azienda'])}</b>
+        <div class="kmeta">${escapeHtml(r['Settore'] || '')} - ${escapeHtml(r['Sede'] || r['Sede Azienda'] || '')}</div>
+        <button class="link-btn" onclick="azSelectEntity('azienda', '${escapeHtml(r['ID Azienda'])}', '${escapeHtml(r['Azienda'])}')">Pianifica follow-up</button>
+      </div>`).join('') || '<p class="sub">Nessuna azienda trovata.</p>';
+
+    document.getElementById('az-people').innerHTML = (result.persone || []).map(r => `
+      <div class="kcard" style="cursor:default">
+        <b class="clickable" onclick="openEntityDetail('persona', '${escapeHtml(r['ID Persona'])}')">${escapeHtml(r['Nome'])} ${escapeHtml(r['Cognome'])}</b>
+        <div class="kmeta">${escapeHtml(r['Job Title'] || '')} - ${escapeHtml(r['Azienda'] || '')}</div>
+        <button class="link-btn" onclick="azSelectEntity('persona', '${escapeHtml(r['ID Persona'])}', '${escapeHtml(r['Nome'] + ' ' + r['Cognome'])}')">Pianifica follow-up</button>
+      </div>`).join('') || '<p class="sub">Nessuna persona trovata.</p>';
+  }
+
+  function azSelectEntity(type, id, label) {
+    azSelected = { type: type, id: id, label: label };
+    document.getElementById('az-selected').textContent = 'Selezionata: ' + label + ' (' + id + ')';
+  }
+
+  function azScheduleFollowUp() {
+    if (!azSelected) { setStatus('az-fuStatus', 'Seleziona prima un\'azienda o una persona.', 'error'); return; }
+    const when = document.getElementById('az-fuDate').value;
+    const title = document.getElementById('az-fuTitle').value.trim() || ('Follow-up ' + azSelected.label);
+    if (!when) { setStatus('az-fuStatus', 'Imposta una data.', 'error'); return; }
+
+    setStatus('az-fuStatus', 'Creazione evento su Calendar...');
+    apiCall('scheduleFollowUp', {
+      entityType: azSelected.type, id: azSelected.id, when: when, title: title,
+      details: document.getElementById('az-fuDetails').value.trim()
+    })
+      .then(() => setStatus('az-fuStatus', 'Promemoria creato su Google Calendar.', 'ok'))
+      .catch(err => setStatus('az-fuStatus', err.message, 'error'));
+  }
+</script>
