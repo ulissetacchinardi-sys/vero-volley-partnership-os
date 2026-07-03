@@ -51,6 +51,42 @@ Each entry should include:
 
 ## July 2026
 
+### ✨ Sprint 3 — Dashboard 2.0
+
+Implemented the redesigned Dashboard (`docs/02_UX/Dashboard.md`) as an extension of the existing
+Overview tab, per `docs/00_Project/IMPLEMENTATION_MASTER_PLAN.md` Sprint 3.
+
+Delivered: team-wide KPI cards (Open Opportunities, Pipeline Value, Activities Today, Follow-ups
+Due, plus two "Coming Soon" placeholders for Proposals/Match Invitations pending later sprints),
+Today's Agenda, Follow-up Center, Open Opportunities table, Contact Directory, a static
+sample-data Upcoming Matches widget, Recent Activities, and an "AI Assistant — Coming Soon"
+placeholder. Added Global Search and two quick actions ("+ Nuova Azienda/Opportunita", "+ Nuova
+Attivita") to the shared header.
+
+This is the first sprint to wire the Activity Engine (`Activity.gs`) into a live workflow —
+`logActivity_` and `getActivityTimeline_` now have real callers, with `Activity.gs` itself left
+unmodified. Both new quick actions route through existing compliant flows only
+(`addSingleLead` for company/opportunity entry, `logActivity_` for activity logging) — no direct
+creation path bypassing deduplication/blacklist/scoring was introduced, per the approved Sprint 3
+decision record.
+
+Per the same decision, "personal" widgets are team-wide for this sprint, not filtered by logged-in
+user: `appsscript.json`'s `executeAs: USER_DEPLOYING` deployment mode does not resolve per-viewer
+identity, and `ID Utente Owner` is unpopulated pending the Migration Engine's first real run
+(Sprint 11). No manual user selector was introduced and no deployment/authentication configuration
+was changed.
+
+Files modified: `Dashboard_AppsScript/Code.gs`, `Dashboard_AppsScript/Dashboard.html`,
+`Dashboard_AppsScript/View_Overview.html`. No other Apps Script or HTML file was touched.
+
+Impact:
+
+`docs/00_Project/{PROJECT_STATUS,FEATURE_REGISTRY}.md` updated: Dashboard (redesigned) and
+Activity Engine both move from Planned/Built-Unwired to Shipped. Next sprint: Sprint 4 — Company
+Workspace.
+
+---
+
 ### 🚀 Blueprint v1.1 Approved
 
 The first complete Blueprint of the Vero Volley Partnership OS has been approved.

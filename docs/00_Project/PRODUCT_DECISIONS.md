@@ -259,3 +259,38 @@ specific sprint in `docs/00_Project/IMPLEMENTATION_MASTER_PLAN.md` names a depen
 ### Date
 
 July 2026
+
+---
+
+## Decision #010
+
+### Decision
+
+Sprint 3 (Dashboard 2.0) ships with team-wide data, not per-logged-in-user data, while keeping the
+Blueprint's "personal" terminology (e.g., "My KPIs," "My Opportunities"). No manual "who am I"
+selector was introduced. All Dashboard quick actions that create a Company, Contact, or
+Opportunity route through the single existing compliant entry point (`addSingleLead`, which runs
+deduplication, blacklist checking, and scoring) — no direct creation path was added.
+
+### Why
+
+True per-user personalization requires two things that don't exist yet: real ownership data
+(`ID Utente Owner`, populated only once the Migration Engine is run — planned for Sprint 11) and a
+deployment mode that resolves per-viewer identity (`appsscript.json` currently uses
+`executeAs: USER_DEPLOYING`, which resolves to the deploying account for every viewer). Building
+either now would mean either faking personalization with a manual selector (rejected, since it's a
+workaround not real auth) or changing the deployment/OAuth configuration mid-sprint (rejected,
+since it's a bigger and differently-sequenced change than Dashboard UI work). Separately, any
+direct company/opportunity creation path bypassing `Dedup.gs` would undermine the compliance
+checks that are this product's core differentiator (`docs/00_Project/Vision.md`).
+
+### Impact
+
+`Dashboard_AppsScript/Code.gs`, `Dashboard.html`, `View_Overview.html`. Future impact: Sprint 11
+(Analytics) and any future personalization work must complete the Migration Engine run and confirm
+deployment identity resolution before per-user filtering can be implemented — see
+`docs/00_Project/IMPLEMENTATION_MASTER_PLAN.md` Sprint 11.
+
+### Date
+
+July 2026

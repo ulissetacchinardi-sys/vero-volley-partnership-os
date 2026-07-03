@@ -1,4 +1,61 @@
 <div class="view active" id="view-overview">
+  <!-- Sprint 3 - Dashboard 2.0: nuove sezioni, dati team-wide (vedi decisione approvata).
+       Le sezioni esistenti sotto (metriche, impostazioni settimanali, funnel, manutenzione,
+       log) restano invariate. -->
+  <section class="panel" style="margin-bottom:18px">
+    <h2>I Miei KPI</h2>
+    <p class="sub">Vista aggregata di tutto il team per questo Sprint: la vista scoperta per
+      singolo commerciale arrivera' con l'attivazione dell'Ownership Engine (identita' utente e
+      dati di assegnazione non ancora popolati).</p>
+    <div class="kpi-grid" id="ov2-kpis"></div>
+  </section>
+
+  <section class="grid" style="margin-bottom:18px">
+    <div class="panel">
+      <h2>Agenda di Oggi</h2>
+      <div id="ov2-agenda"></div>
+    </div>
+    <div class="panel">
+      <h2>Centro Follow-up</h2>
+      <div id="ov2-followups"></div>
+    </div>
+  </section>
+
+  <section class="grid" style="margin-bottom:18px">
+    <div class="panel">
+      <h2>Opportunita Aperte</h2>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Azienda</th><th>Fase</th><th>Valore Stimato</th><th>Ultimo Contatto</th><th>Prossima Azione</th></tr></thead>
+        <tbody id="ov2-opportunitiesTable"></tbody>
+      </table></div>
+    </div>
+    <div class="panel">
+      <h2>Rubrica Contatti</h2>
+      <input id="ov2-directorySearch" placeholder="Cerca per nome, azienda..." oninput="ov2DirectorySearchDebounced()">
+      <div id="ov2-directoryResults" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <section class="grid" style="margin-bottom:18px">
+    <div class="panel">
+      <h2>Prossime Partite</h2>
+      <p class="sub">Dati di esempio: il collegamento al calendario partite reale e alla gestione
+        Hospitality arrivera' in una sprint futura.</p>
+      <div id="ov2-matches"></div>
+    </div>
+    <div class="panel">
+      <h2>Attivita Recenti</h2>
+      <div id="ov2-recentActivities"></div>
+    </div>
+  </section>
+
+  <section style="margin-bottom:18px">
+    <div class="panel">
+      <h2>Assistente AI</h2>
+      <p class="sub">Prossimamente.</p>
+    </div>
+  </section>
+
   <section class="metrics">
     <div class="metric"><div class="label">Lead attivi</div><div class="value" id="ov-totalLeads">-</div></div>
     <div class="metric"><div class="label">Score medio</div><div class="value" id="ov-averageScore">-</div></div>
@@ -97,6 +154,14 @@
     ovRenderTopBars('ov-sectorBars', data.metrics.sectors || []);
     ovRenderLogs(data.recentLogs || []);
     ovRenderFunnel(data.funnel || []);
+
+    // Sprint 3 - Dashboard 2.0
+    ov2RenderKpis(data.kpisV2 || {});
+    ov2RenderAgenda(data.agenda || { activities: [], followUps: [] });
+    ov2RenderFollowUps(data.followUps || { upcoming: [], late: [] });
+    ov2RenderOpportunities(data.teamOpportunities || []);
+    ov2RenderRecentActivities(data.recentActivities || []);
+    ov2RenderMatchesPlaceholder();
   }
 
   function ovHydrateForm(data) {
@@ -201,4 +266,119 @@
         <div class="bar"><div class="fill" style="width:${Math.round((s.valore / max) * 100)}%"></div></div>
       </div>`).join('');
   }
+
+  // --- Sprint 3 - Dashboard 2.0 ---
+
+  function ov2RenderKpis(k) {
+    const cards = [
+      { label: 'Opportunita Aperte', value: k.openOpportunities !== undefined ? k.openOpportunities : '-' },
+      { label: 'Valore Pipeline', value: k.pipelineValue !== undefined ? (k.pipelineValue + ' EUR') : '-' },
+      { label: 'Attivita Oggi', value: k.activitiesToday !== undefined ? k.activitiesToday : '-' },
+      { label: 'Follow-up in Scadenza', value: k.followUpsDue !== undefined ? k.followUpsDue : '-' },
+      { label: 'Proposte Inviate', value: 'Prossimamente' },
+      { label: 'Inviti Partita Inviati', value: 'Prossimamente' }
+    ];
+    document.getElementById('ov2-kpis').innerHTML = cards.map(c => `
+      <div class="metric"><div class="label">${escapeHtml(c.label)}</div><div class="value">${escapeHtml(c.value)}</div></div>
+    `).join('');
+  }
+
+  function ov2RenderAgenda(agenda) {
+    const activities = agenda.activities || [];
+    const followUps = agenda.followUps || [];
+    const container = document.getElementById('ov2-agenda');
+    if (!activities.length && !followUps.length) {
+      container.innerHTML = '<p class="sub">Nessuna attivita pianificata o follow-up in scadenza oggi.</p>';
+      return;
+    }
+    let html = '';
+    if (activities.length) {
+      html += '<h4 class="sub" style="text-transform:uppercase;font-weight:700">Attivita pianificate</h4>';
+      html += activities.map(a => `<div class="sub" style="margin-bottom:6px">
+        <b>${escapeHtml(a['Tipo'])}</b> - ${escapeHtml(a['Titolo'] || 'Senza titolo')}
+        ${a.AziendaNome ? '(' + escapeHtml(a.AziendaNome) + ')' : ''}
+      </div>`).join('');
+    }
+    if (followUps.length) {
+      html += '<h4 class="sub" style="text-transform:uppercase;font-weight:700;margin-top:10px">Follow-up di oggi</h4>';
+      html += followUps.map(f => `<div class="sub" style="margin-bottom:6px">
+        ${f.scaduto ? '<span class="pill a">In ritardo</span> ' : ''}
+        ${escapeHtml(f.tipo)} - ${escapeHtml(f.azienda || f.contatto || '-')}
+      </div>`).join('');
+    }
+    container.innerHTML = html;
+  }
+
+  function ov2RenderFollowUps(followUps) {
+    const upcoming = followUps.upcoming || [];
+    const late = followUps.late || [];
+    const container = document.getElementById('ov2-followups');
+    if (!upcoming.length && !late.length) {
+      container.innerHTML = '<p class="sub">Nessun follow-up pianificato.</p>';
+      return;
+    }
+    const line = f => `<div class="sub" style="margin-bottom:6px">
+      ${f.scaduto ? '<span class="pill a">In ritardo</span>' : '<span class="pill c">In arrivo</span>'}
+      ${escapeHtml(f.tipo)} - ${escapeHtml(f.azienda || f.contatto || '-')} (${escapeHtml(f.scadenza)})
+      ${f.prossimaAzione ? '<br>' + escapeHtml(f.prossimaAzione) : ''}
+    </div>`;
+    // I ritardi prima, come da specifica Dashboard.md ("Late follow-ups should appear first").
+    container.innerHTML = late.map(line).join('') + upcoming.map(line).join('');
+  }
+
+  function ov2RenderOpportunities(rows) {
+    document.getElementById('ov2-opportunitiesTable').innerHTML = rows.map(r => `
+      <tr class="clickable" onclick="openEntityDetail('azienda', '${escapeHtml(r.aziendaId)}')">
+        <td>${escapeHtml(r.azienda)}</td>
+        <td>${escapeHtml(r.fase)}</td>
+        <td>${escapeHtml(r.valoreStimato || '0')} EUR</td>
+        <td>${escapeHtml(r.ultimoContatto || '-')}</td>
+        <td>${escapeHtml(r.prossimaAzione || '-')}</td>
+      </tr>`).join('') || '<tr><td colspan="5">Nessuna opportunita aperta.</td></tr>';
+  }
+
+  function ov2RenderRecentActivities(rows) {
+    document.getElementById('ov2-recentActivities').innerHTML = rows.length ? rows.map(r => `
+      <div class="sub" style="margin-bottom:8px">
+        <b>${escapeHtml(r['Tipo'] || 'Attivita')}</b>
+        ${r.AziendaNome ? '- ' + escapeHtml(r.AziendaNome) : ''}
+        <br>${escapeHtml(r['Titolo'] || '')} (${escapeHtml(r['Data Creazione'] || '')})
+      </div>`).join('') : '<p class="sub">Nessuna attivita registrata ancora. Usa "+ Nuova Attivita" nell\'intestazione per iniziare a costruire lo storico.</p>';
+  }
+
+  function ov2RenderMatchesPlaceholder() {
+    // Dati di esempio, esplicitamente approvati per lo Sprint 3: nessuna entita' Match/Hospitality
+    // esiste ancora nello schema (arriva con Sprint 8). Nessuna chiamata al server per questa
+    // sezione: e' statica per design, non un endpoint finto che restituisce dati falsi.
+    const sampleMatches = [
+      { avversario: 'Allianz Milano', data: '2026-07-12', sede: 'PalaBanco, Monza' },
+      { avversario: 'Sir Susa Perugia', data: '2026-07-19', sede: 'PalaBanco, Monza' }
+    ];
+    document.getElementById('ov2-matches').innerHTML = sampleMatches.map(m => `
+      <div class="sub" style="margin-bottom:8px">
+        <b>Vero Volley vs ${escapeHtml(m.avversario)}</b><br>${escapeHtml(m.data)} - ${escapeHtml(m.sede)}
+      </div>`).join('');
+  }
+
+  let ov2DirectoryTimer = null;
+  function ov2DirectorySearchDebounced() {
+    clearTimeout(ov2DirectoryTimer);
+    ov2DirectoryTimer = setTimeout(ov2RunDirectorySearch, 300);
+  }
+
+  function ov2RunDirectorySearch() {
+    const query = document.getElementById('ov2-directorySearch').value.trim();
+    const container = document.getElementById('ov2-directoryResults');
+    apiCall('getContactDirectory', query).then(rows => {
+      container.innerHTML = rows.length ? rows.map(r => `
+        <div class="sub clickable" style="margin-bottom:8px" onclick="openEntityDetail('persona', '${escapeHtml(r.id)}')">
+          <b>${escapeHtml(r.nome)} ${escapeHtml(r.cognome)}</b> ${r.jobTitle ? '- ' + escapeHtml(r.jobTitle) : ''}
+          <br>${escapeHtml(r.azienda || '-')}
+          ${r.email ? '<br>' + escapeHtml(r.email) : ''}
+          ${r.telefono ? ' - ' + escapeHtml(r.telefono) : ''}
+        </div>`).join('') : '<p class="sub">Nessun contatto trovato.</p>';
+    }).catch(err => { container.innerHTML = '<p class="status error">' + escapeHtml(err.message) + '</p>'; });
+  }
+
+  ov2RunDirectorySearch();
 </script>

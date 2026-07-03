@@ -113,7 +113,7 @@ UI — this is distinct from the redesigned, not-yet-built Workspace UX describe
 | Role model + permission matrix | 🟡 Built (Unwired) | `System.gs`, `docs/04_Business_Rules/Permissions.md` |
 | Identity resolution from Workspace session | 🟡 Built (Unwired) | `System.gs:getCurrentUser` |
 | Migration helpers (owner-from-text-field bootstrap, owner-ID backfill) | 🟡 Built (Unwired) | `Migration.gs` — manual-only; not yet run against live data |
-| Activity / timeline engine | 🟡 Built (Unwired) | `Activity.gs`, `docs/03_Data_Model/Activities.md` |
+| Activity / timeline engine | 🟢 Shipped | `Activity.gs` (unmodified), first live callers wired in Sprint 3 (`Code.gs:logDashboardActivity`, `buildDashboardAgenda_`, Recent Activities widget) |
 | Ownership + collaboration engine | 🟡 Built (Unwired) | `Ownership.gs`, `docs/03_Data_Model/Ownership.md` |
 | Personal / Manager dashboards scoped by ownership | ⚪ Planned | `docs/06_Roadmap/Roadmap.md` |
 | Permission enforcement (`SYSTEM_CONFIG.enforcePermissions`) | ⚪ Planned | `docs/04_Business_Rules/Permissions.md` Section 6 |
@@ -126,7 +126,7 @@ front end for the same records.
 
 | Feature | Status | Reference |
 |---|---|---|
-| Dashboard (redesigned, "AI-first" version) | ⚪ Planned | `docs/02_UX/Dashboard.md` — blueprint complete |
+| Dashboard (redesigned, "Dashboard 2.0") | 🟢 Shipped (Sprint 3) | `docs/02_UX/Dashboard.md`, `Dashboard.html`/`View_Overview.html`. Team-wide scope only — AI Sponsor Research, AI Daily Briefing, Notifications, Business Community, Personal Performance sections deferred, see `docs/00_Project/IMPLEMENTATION_MASTER_PLAN.md` Sprint 3 |
 | Company Workspace | ⚪ Planned | `docs/02_UX/Workspace_Azienda.md` — blueprint complete |
 | Opportunity Workspace | ⚪ Planned | `docs/02_UX/Workspace_Trattativa.md` — blueprint complete |
 | Contact Workspace | ⚪ Planned | Not yet designed — no `docs/02_UX/` file exists for this yet |

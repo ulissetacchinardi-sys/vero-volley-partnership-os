@@ -40,6 +40,12 @@ function getDashboardData() {
   const logRows = getAllRecords_('logAutomazioni');
   const board = getPipelineBoard_();
 
+  // Sprint 3 (Dashboard 2.0): sezioni aggiuntive team-wide. Nessuna di queste tocca Dedup.gs,
+  // Scoring.gs, Pipeline.gs o Activity.gs: leggono solo dati gia' esistenti tramite le funzioni
+  // pubbliche gia' presenti in quei moduli (getPipelineBoard_, getActivityTimeline_, ecc.).
+  const followUps = buildFollowUpCenter_();
+  const agenda = buildDashboardAgenda_(followUps);
+
   return {
     now: formatDate_(new Date()),
     week: getWeekLabel_(new Date()),
@@ -49,8 +55,172 @@ function getDashboardData() {
     funnel: buildFunnel_(leadRows, board),
     pipeline: board,
     recentLogs: logRows.slice(-8).reverse(),
-    recentSettings: settingsRows.slice(-5).reverse()
+    recentSettings: settingsRows.slice(-5).reverse(),
+    kpisV2: buildDashboardKpis_(board, followUps, agenda),
+    agenda: agenda,
+    followUps: followUps,
+    teamOpportunities: buildTeamOpportunities_(),
+    recentActivities: enrichActivitiesWithAziendaLabel_(getActivityTimeline_({}).slice(0, 8))
   };
+}
+
+/**
+ * "Attivita" (Activity.gs) non ha una colonna testuale "Azienda" denormalizzata, solo "ID
+ * Azienda" - a differenza degli altri fogli dello schema. Questa funzione aggiunge un campo di
+ * sola presentazione "AziendaNome" per la UI, senza toccare Activity.gs ne' il foglio stesso.
+ */
+function enrichActivitiesWithAziendaLabel_(activities) {
+  return activities.map(a => Object.assign({}, a, { AziendaNome: resolveAziendaLabel_(a['ID Azienda']) }));
+}
+
+function resolveAziendaLabel_(aziendaId) {
+  if (!aziendaId) return '';
+  const record = findRecordById_('aziendeTarget', aziendaId) || findRecordById_('aziendeContattate', aziendaId);
+  return record ? record['Azienda'] : aziendaId;
+}
+
+/**
+ * KPI del Dashboard 2.0 (Sprint 3). Team-wide per decisione esplicita: l'ownership reale
+ * (ID Utente Owner) non e' ancora popolata (Migration Engine non eseguito) e la web app non
+ * risolve l'identita' per-utente nell'attuale modalita' di deploy (executeAs: USER_DEPLOYING) -
+ * vedi docs/04_Business_Rules/Permissions.md Sezione 4. "Proposte Inviate" e "Inviti Partita
+ * Inviati" non hanno ancora un'entita' dati (Proposal: Sprint 6; Match/Hospitality: Sprint 8):
+ * restano null e la UI li mostra come "Prossimamente" invece di un falso zero.
+ */
+function buildDashboardKpis_(board, followUps, agenda) {
+  const openColumns = getOpenPipelineColumns_(board);
+  return {
+    openOpportunities: openColumns.reduce((sum, col) => sum + col.trattative.length, 0),
+    pipelineValue: openColumns.reduce((sum, col) => sum + col.valoreTotale, 0),
+    activitiesToday: agenda.activities.length,
+    followUpsDue: followUps.upcoming.length + followUps.late.length,
+    proposalsSent: null,
+    matchInvitationsSent: null
+  };
+}
+
+/**
+ * Agenda di oggi: attivita' pianificate (Activity Engine, invariato) con Data Scadenza odierna,
+ * piu' i follow-up (Data Follow Up, gia' esistente su piu' fogli) in scadenza oggi. Ordinamento:
+ * i follow-up scaduti prima, poi per orario - lo schema Attivita' non ha un campo "priorita'"
+ * dedicato oggi (vedi Known Limitations del completion report), quindi non viene simulato qui.
+ */
+function buildDashboardAgenda_(followUps) {
+  const todayKey = Utilities.formatDate(new Date(), CONFIG.timezone, 'yyyy-MM-dd');
+  const activitiesToday = enrichActivitiesWithAziendaLabel_(
+    getActivityTimeline_({ stato: ACTIVITY_STATUSES.PLANNED }).filter(a => {
+      const d = new Date(a['Data Scadenza']);
+      return !isNaN(d.getTime()) && Utilities.formatDate(d, CONFIG.timezone, 'yyyy-MM-dd') === todayKey;
+    })
+  );
+  const followUpsToday = followUps.upcoming.concat(followUps.late).filter(f => {
+    const d = new Date(f.scadenza);
+    return !isNaN(d.getTime()) && Utilities.formatDate(d, CONFIG.timezone, 'yyyy-MM-dd') === todayKey;
+  });
+  followUpsToday.sort((a, b) => (a.scaduto === b.scaduto ? 0 : a.scaduto ? -1 : 1));
+  return { activities: activitiesToday, followUps: followUpsToday };
+}
+
+// Fogli che portano gia' oggi il campo "Data Follow Up" (funzionalita' esistente, non introdotta
+// in questo sprint - vedi Outreach.gs:createFollowUpEvent_).
+const FOLLOWUP_SOURCE_SHEETS_ = [
+  { key: 'leadWeekly', tipo: 'Lead', persona: true },
+  { key: 'aziendeContattate', tipo: 'Azienda', persona: false },
+  { key: 'personeContattate', tipo: 'Persona', persona: true },
+  { key: 'trattativeAperte', tipo: 'Trattativa', persona: false }
+];
+
+/** Centro Follow-up: legge "Data Follow Up" sui quattro fogli che gia' lo popolano, senza modificarli. */
+function buildFollowUpCenter_() {
+  const now = new Date();
+  const upcoming = [];
+  const late = [];
+
+  FOLLOWUP_SOURCE_SHEETS_.forEach(source => {
+    getAllRecords_(source.key).forEach(row => {
+      const raw = row['Data Follow Up'];
+      if (!raw) return;
+      const due = new Date(raw);
+      if (isNaN(due.getTime())) return;
+
+      const entry = {
+        tipo: source.tipo,
+        azienda: row['Azienda'] || '',
+        contatto: source.persona ? (clean_(row['Nome']) + ' ' + clean_(row['Cognome'])).trim() : '',
+        scadenza: raw,
+        scaduto: due < now,
+        prossimaAzione: row['Prossima Azione'] || ''
+      };
+      (entry.scaduto ? late : upcoming).push(entry);
+    });
+  });
+
+  upcoming.sort((a, b) => new Date(a.scadenza) - new Date(b.scadenza));
+  late.sort((a, b) => new Date(a.scadenza) - new Date(b.scadenza));
+  return { upcoming: upcoming.slice(0, 20), late: late.slice(0, 20) };
+}
+
+/**
+ * Opportunita' aperte per la tabella compatta del Dashboard 2.0. "Ultimo Contatto" usa la Data
+ * Ultimo Contatto dell'azienda collegata (Aziende Gia Contattate) quando disponibile, altrimenti
+ * la Data Apertura della trattativa - nessun nuovo campo, solo dati gia' esistenti.
+ */
+function buildTeamOpportunities_() {
+  const trattative = getAllRecords_('trattativeAperte').filter(t => isFaseAperta_(t['Fase']));
+  const lastContactByAzienda = {};
+  getAllRecords_('aziendeContattate').forEach(a => { lastContactByAzienda[a['ID Azienda']] = a['Data Ultimo Contatto']; });
+
+  return trattative.map(t => ({
+    id: t['ID Trattativa'],
+    aziendaId: t['ID Azienda'],
+    azienda: t['Azienda'],
+    fase: t['Fase'],
+    valoreStimato: t['Valore Stimato'] || '',
+    ultimoContatto: lastContactByAzienda[t['ID Azienda']] || t['Data Apertura'] || '',
+    prossimaAzione: t['Prossima Azione'] || ''
+  })).sort((a, b) => new Date(b.ultimoContatto || 0) - new Date(a.ultimoContatto || 0));
+}
+
+/** Rubrica contatti del Dashboard 2.0: stessa fonte dati/dedup di searchEntities_, riuso diretto. */
+function getContactDirectory(query) {
+  return getContactDirectory_(query);
+}
+
+function getContactDirectory_(query) {
+  const q = normalizeCompanyName_(query || '');
+  const combined = dedupeById_(
+    getAllRecords_('personeContattate').concat(getAllRecords_('leadWeekly')).filter(r => r['ID Persona']),
+    'ID Persona'
+  );
+  const filtered = q
+    ? combined.filter(r => normalizeCompanyName_(r['Nome'] + ' ' + r['Cognome'] + ' ' + r['Azienda']).indexOf(q) !== -1)
+    : combined;
+
+  return filtered.slice(0, 30).map(r => ({
+    id: r['ID Persona'],
+    nome: r['Nome'] || '', cognome: r['Cognome'] || '', azienda: r['Azienda'] || '',
+    jobTitle: r['Job Title'] || '', email: r['Email'] || '', telefono: r['Telefono'] || ''
+  }));
+}
+
+/**
+ * Unico punto da cui il Dashboard 2.0 registra un'attivita' manuale ("+ Nuova Attivita'").
+ * Chiama logActivity_() cosi' come esiste in Activity.gs, senza modificarlo: e' il primo
+ * chiamante live del motore Attivita' (Sprint 3, come da IMPLEMENTATION_MASTER_PLAN.md).
+ */
+function logDashboardActivity(payload) {
+  payload = payload || {};
+  logActivity_({
+    tipo: payload.tipo || ACTIVITY_TYPES.NOTE,
+    titolo: clean_(payload.titolo),
+    descrizione: clean_(payload.descrizione),
+    idAzienda: payload.idAzienda || '',
+    idPersona: payload.idPersona || '',
+    idTrattativa: payload.idTrattativa || '',
+    stato: ACTIVITY_STATUSES.COMPLETED,
+    origine: ACTIVITY_SOURCES.MANUAL
+  });
+  return getDashboardData();
 }
 
 function buildMetrics_(rows) {
@@ -73,10 +243,25 @@ function buildMetrics_(rows) {
   };
 }
 
+/**
+ * Una fase e' "aperta" se non e' una delle due fasi di chiusura (vinta/persa). Estratta durante
+ * lo Sprint 3 per eliminare la duplicazione che stava emergendo tra buildFunnel_ (gia' esistente)
+ * e le nuove aggregazioni del Dashboard 2.0 (buildDashboardKpis_/buildTeamOpportunities_).
+ * Triggers.gs:weeklyMaintenance_ ha ancora una propria copia dello stesso controllo: e' fuori dal
+ * file-scope approvato per questo sprint, quindi non e' stata toccata - vedi Known Limitations.
+ */
+function isFaseAperta_(fase) {
+  return String(fase || '').indexOf('Chiusura') === -1;
+}
+
+function getOpenPipelineColumns_(board) {
+  return board.filter(col => isFaseAperta_(col.fase));
+}
+
 /** Conteggio lead per ciascuno stadio del funnel commerciale, dal primo contatto alla trattativa. */
 function buildFunnel_(leadRows, board) {
   const status = countBy_(leadRows, 'Stato');
-  const trattativeAttive = board.filter(col => col.fase.indexOf('Chiusura') === -1)
+  const trattativeAttive = getOpenPipelineColumns_(board)
     .reduce((sum, col) => sum + col.trattative.length, 0);
   const vinte = (board.find(col => col.fase === 'Chiusura vinta') || { trattative: [] }).trattative.length;
 

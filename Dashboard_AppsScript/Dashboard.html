@@ -121,6 +121,35 @@
       .drawer-section h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; color: var(--muted); }
       .link-btn { background: none; border: none; color: var(--brand); font-weight: 700; cursor: pointer; padding: 0; font-size: 13px; }
 
+      /* Sprint 3 - Dashboard 2.0: header search, quick actions, modali. Riusa i token e le
+         classi (.panel, .fields, .actions, .status, .primary/.secondary, .metric) gia' definiti
+         sopra invece di introdurre un nuovo linguaggio visivo. */
+      .header-search { position: relative; flex: 1 1 260px; max-width: 360px; }
+      .header-search-results {
+        display: none; position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px;
+        background: #fff; border: 1px solid var(--line); border-radius: 8px; max-height: 320px;
+        overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.08); z-index: 15;
+      }
+      .header-search-results.open { display: block; }
+      .header-search-results .result-item { padding: 8px 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--line); }
+      .header-search-results .result-item:last-child { border-bottom: 0; }
+      .header-search-results .result-item:hover { background: #f7f9fc; }
+      .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+      .modal-overlay {
+        display: none; position: fixed; inset: 0; background: rgba(15, 23, 32, 0.45); z-index: 30;
+      }
+      .modal-overlay.open { display: block; }
+      .modal-box {
+        display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: #fff; border-radius: 10px; width: min(520px, 92vw); max-height: 86vh;
+        overflow-y: auto; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); z-index: 31;
+      }
+      .modal-box.open { display: block; }
+      .modal-box h2 { display: flex; justify-content: space-between; align-items: center; }
+
+      .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+
       @media (max-width: 860px) {
         .grid, .fields, .metrics { grid-template-columns: 1fr; }
         header { align-items: flex-start; flex-direction: column; }
@@ -131,7 +160,12 @@
     <header>
       <div>
         <h1>Vero Volley - Sponsor CRM</h1>
+        <div class="sub" id="welcomeLine"></div>
         <div class="sub" id="subtitle">Caricamento dati...</div>
+      </div>
+      <div class="header-search">
+        <input id="globalSearchInput" placeholder="Cerca aziende o persone..." oninput="globalSearchDebounced()" onfocus="globalSearchDebounced()">
+        <div class="header-search-results" id="globalSearchResults"></div>
       </div>
       <nav>
         <button class="tab active" data-view="overview" onclick="showView('overview')">Dashboard</button>
@@ -140,6 +174,10 @@
         <button class="tab" data-view="aziende" onclick="showView('aziende')">Aziende &amp; Contatti</button>
         <button class="secondary" onclick="refreshAll()">Aggiorna</button>
       </nav>
+      <div class="header-actions">
+        <button class="primary" onclick="openQuickLeadModal()">+ Nuova Azienda/Opportunita</button>
+        <button class="secondary" onclick="openQuickActivityModal()">+ Nuova Attivita</button>
+      </div>
     </header>
 
     <main class="shell">
@@ -153,6 +191,61 @@
     <aside class="drawer" id="drawer">
       <div id="drawerContent"></div>
     </aside>
+
+    <!-- Sprint 3 - Dashboard 2.0: "Nuova Azienda/Opportunita" e "Nuova Attivita" sono le uniche
+         due modalita' di creazione dalla Dashboard. Il quick-lead riusa addSingleLead (Dedup.gs +
+         Scoring.gs restano l'unico punto di ingresso per aziende/opportunita', come da decisione
+         approvata): non esiste ne' e' previsto un percorso di creazione diretta che salti la
+         deduplica/blacklist/scoring. -->
+    <div class="modal-overlay" id="quickLeadOverlay" onclick="closeQuickLeadModal()"></div>
+    <div class="modal-box" id="quickLeadModal">
+      <h2>Nuova Azienda / Opportunita<button class="link-btn" onclick="closeQuickLeadModal()">Chiudi</button></h2>
+      <p class="sub">Le nuove aziende e opportunita entrano sempre dal flusso di qualifica lead
+        (deduplica, controllo blacklist e scoring inclusi) - questo modulo e lo stesso usato dal
+        tab "Lead Weekly".</p>
+      <div class="fields">
+        <div><label for="ql-nome">Nome</label><input id="ql-nome"></div>
+        <div><label for="ql-cognome">Cognome</label><input id="ql-cognome"></div>
+        <div><label for="ql-jobTitle">Job Title</label><input id="ql-jobTitle"></div>
+        <div><label for="ql-azienda">Azienda</label><input id="ql-azienda"></div>
+        <div><label for="ql-settore">Settore</label><input id="ql-settore"></div>
+        <div><label for="ql-sede">Sede</label><input id="ql-sede"></div>
+        <div><label for="ql-linkedin">LinkedIn URL</label><input id="ql-linkedin"></div>
+        <div><label for="ql-sitoWeb">Sito Web Azienda</label><input id="ql-sitoWeb"></div>
+      </div>
+      <div class="actions">
+        <button class="secondary" onclick="closeQuickLeadModal()">Annulla</button>
+        <button class="primary" onclick="submitQuickLead()">Valuta e aggiungi</button>
+      </div>
+      <div class="status" id="ql-status"></div>
+    </div>
+
+    <div class="modal-overlay" id="quickActivityOverlay" onclick="closeQuickActivityModal()"></div>
+    <div class="modal-box" id="quickActivityModal">
+      <h2>Nuova Attivita<button class="link-btn" onclick="closeQuickActivityModal()">Chiudi</button></h2>
+      <p class="sub">Registra una chiamata, email, riunione o nota. Puoi collegarla a un'azienda
+        cercandola qui sotto (facoltativo).</p>
+      <div class="fields">
+        <div>
+          <label for="qa-tipo">Tipo</label>
+          <select id="qa-tipo">
+            <option value="Chiamata">Chiamata</option>
+            <option value="Email">Email</option>
+            <option value="Riunione">Riunione</option>
+            <option value="Nota" selected>Nota</option>
+          </select>
+        </div>
+        <div><label for="qa-azienda">Azienda (facoltativo)</label><input id="qa-azienda" placeholder="Cerca per nome..." oninput="quickActivityAziendaSearch()"></div>
+        <div class="full" id="qa-aziendaResults"></div>
+        <div class="full"><label for="qa-titolo">Titolo</label><input id="qa-titolo"></div>
+        <div class="full"><label for="qa-descrizione">Descrizione</label><textarea id="qa-descrizione"></textarea></div>
+      </div>
+      <div class="actions">
+        <button class="secondary" onclick="closeQuickActivityModal()">Annulla</button>
+        <button class="primary" onclick="submitQuickActivity()">Registra attivita</button>
+      </div>
+      <div class="status" id="qa-status"></div>
+    </div>
 
     <script>
       let state = null;
@@ -287,6 +380,154 @@
         reader.readAsDataURL(file);
       }
 
+      // --- Sprint 3 - Dashboard 2.0: intestazione (saluto, ricerca globale, azioni rapide) ---
+
+      function renderWelcomeBanner() {
+        // Nessun nome personalizzato: l'identita' per-utente non e' ancora risolvibile con
+        // l'attuale modalita' di deploy (executeAs: USER_DEPLOYING) - vedi decisione approvata
+        // per lo Sprint 3 e docs/04_Business_Rules/Permissions.md Sezione 4.
+        const days = ['Domenica', 'Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato'];
+        const months = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio',
+          'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+        const now = new Date();
+        document.getElementById('welcomeLine').textContent =
+          'Buongiorno - ' + days[now.getDay()] + ' ' + now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+      }
+
+      let globalSearchTimer = null;
+      function globalSearchDebounced() {
+        clearTimeout(globalSearchTimer);
+        globalSearchTimer = setTimeout(runGlobalSearch, 300);
+      }
+
+      function runGlobalSearch() {
+        const query = document.getElementById('globalSearchInput').value.trim();
+        const resultsEl = document.getElementById('globalSearchResults');
+        if (!query) { resultsEl.classList.remove('open'); resultsEl.innerHTML = ''; return; }
+        apiCall('searchEntities', query).then(result => {
+          const rows = (result.aziende || []).map(r => ({ type: 'azienda', id: r['ID Azienda'], label: r['Azienda'] }))
+            .concat((result.persone || []).map(r => ({
+              type: 'persona', id: r['ID Persona'],
+              label: (r['Nome'] + ' ' + r['Cognome']).trim() + (r['Azienda'] ? ' - ' + r['Azienda'] : '')
+            })));
+          resultsEl.innerHTML = rows.length
+            ? rows.map(r => '<div class="result-item" onclick="selectGlobalSearchResult(\'' + r.type + '\',\'' + escapeHtml(r.id) + '\')">' + escapeHtml(r.label) + '</div>').join('')
+            : '<div class="result-item">Nessun risultato.</div>';
+          resultsEl.classList.add('open');
+        }).catch(() => { resultsEl.classList.remove('open'); });
+      }
+
+      function selectGlobalSearchResult(type, id) {
+        document.getElementById('globalSearchResults').classList.remove('open');
+        document.getElementById('globalSearchInput').value = '';
+        openEntityDetail(type, id);
+      }
+
+      document.addEventListener('click', event => {
+        const box = document.getElementById('globalSearchResults');
+        const input = document.getElementById('globalSearchInput');
+        if (box && !box.contains(event.target) && event.target !== input) box.classList.remove('open');
+      });
+
+      // --- Modale "Nuova Azienda / Opportunita": riusa addSingleLead (dedup + scoring intatti) ---
+
+      function openQuickLeadModal() {
+        ['ql-nome', 'ql-cognome', 'ql-jobTitle', 'ql-azienda', 'ql-settore', 'ql-sede', 'ql-linkedin', 'ql-sitoWeb']
+          .forEach(id => document.getElementById(id).value = '');
+        setStatus('ql-status', '');
+        document.getElementById('quickLeadOverlay').classList.add('open');
+        document.getElementById('quickLeadModal').classList.add('open');
+      }
+
+      function closeQuickLeadModal() {
+        document.getElementById('quickLeadOverlay').classList.remove('open');
+        document.getElementById('quickLeadModal').classList.remove('open');
+      }
+
+      function submitQuickLead() {
+        const payload = {
+          nome: document.getElementById('ql-nome').value.trim(),
+          cognome: document.getElementById('ql-cognome').value.trim(),
+          jobTitle: document.getElementById('ql-jobTitle').value.trim(),
+          azienda: document.getElementById('ql-azienda').value.trim(),
+          settore: document.getElementById('ql-settore').value.trim(),
+          sede: document.getElementById('ql-sede').value.trim(),
+          linkedinUrl: document.getElementById('ql-linkedin').value.trim(),
+          sitoWebAzienda: document.getElementById('ql-sitoWeb').value.trim()
+        };
+        if (!payload.azienda) { setStatus('ql-status', 'Il nome azienda e obbligatorio.', 'error'); return; }
+        setStatus('ql-status', 'Verifica deduplica/blacklist in corso...');
+        apiCall('addSingleLead', payload).then(result => {
+          if (result.accepted) {
+            setStatus('ql-status', 'Aggiunto a Lead Weekly (score ' + result.lead['Sponsor Fit Score'] + ').', 'ok');
+          } else {
+            setStatus('ql-status', 'Non aggiunto: ' + result.reason, 'error');
+          }
+          refreshAll();
+        }).catch(err => setStatus('ql-status', err.message, 'error'));
+      }
+
+      // --- Modale "Nuova Attivita": chiama logDashboardActivity -> logActivity_ (Activity.gs, invariato) ---
+
+      let qaSelectedAzienda = null;
+
+      function openQuickActivityModal() {
+        document.getElementById('qa-titolo').value = '';
+        document.getElementById('qa-descrizione').value = '';
+        document.getElementById('qa-azienda').value = '';
+        document.getElementById('qa-aziendaResults').innerHTML = '';
+        qaSelectedAzienda = null;
+        setStatus('qa-status', '');
+        document.getElementById('quickActivityOverlay').classList.add('open');
+        document.getElementById('quickActivityModal').classList.add('open');
+      }
+
+      function closeQuickActivityModal() {
+        document.getElementById('quickActivityOverlay').classList.remove('open');
+        document.getElementById('quickActivityModal').classList.remove('open');
+      }
+
+      let qaSearchTimer = null;
+      function quickActivityAziendaSearch() {
+        clearTimeout(qaSearchTimer);
+        qaSearchTimer = setTimeout(() => {
+          const query = document.getElementById('qa-azienda').value.trim();
+          const resultsEl = document.getElementById('qa-aziendaResults');
+          if (!query) { resultsEl.innerHTML = ''; return; }
+          apiCall('searchEntities', query).then(result => {
+            const aziende = result.aziende || [];
+            resultsEl.innerHTML = aziende.length
+              ? aziende.map(r => '<div class="pill" style="cursor:pointer" onclick="selectQuickActivityAzienda(\'' +
+                  escapeHtml(r['ID Azienda']) + '\',\'' + escapeHtml(r['Azienda']) + '\')">' + escapeHtml(r['Azienda']) + '</div>').join('')
+              : '<div class="sub">Nessuna azienda trovata.</div>';
+          });
+        }, 300);
+      }
+
+      function selectQuickActivityAzienda(id, label) {
+        qaSelectedAzienda = { id: id, label: label };
+        document.getElementById('qa-azienda').value = label;
+        document.getElementById('qa-aziendaResults').innerHTML = '';
+      }
+
+      function submitQuickActivity() {
+        const titolo = document.getElementById('qa-titolo').value.trim();
+        if (!titolo) { setStatus('qa-status', 'Il titolo e obbligatorio.', 'error'); return; }
+        setStatus('qa-status', 'Registrazione in corso...');
+        apiCall('logDashboardActivity', {
+          tipo: document.getElementById('qa-tipo').value,
+          titolo: titolo,
+          descrizione: document.getElementById('qa-descrizione').value.trim(),
+          idAzienda: qaSelectedAzienda ? qaSelectedAzienda.id : ''
+        }).then(data => {
+          state = data;
+          renderOverview(data);
+          setStatus('qa-status', 'Attivita registrata.', 'ok');
+          setTimeout(closeQuickActivityModal, 800);
+        }).catch(err => setStatus('qa-status', err.message, 'error'));
+      }
+
+      renderWelcomeBanner();
       refreshAll();
     </script>
   </body>

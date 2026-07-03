@@ -92,7 +92,7 @@ old legend, `FEATURE_REGISTRY.md`'s old legend, and `01_Product/Features.md`'s p
 | Settings (current, shipped) | 🟢 | **Corrected in v1.1** — was incorrectly marked Planned; configuration is live today via the Dashboard tab and the `Dashboard Config` sheet, see `docs/02_UX/Settings.md` |
 | Dashboard (current, shipped Overview tab) | 🟢 | Live today; distinct from the redesigned version below |
 | Company Workspace / Opportunity Workspace (current, shipped drawer) | 🟢 | Live today as a shared detail drawer; distinct from the redesigned full-page version below |
-| Dashboard (redesigned) | ⚪ | Planned — blueprint complete, `docs/02_UX/Dashboard.md` |
+| Dashboard (redesigned, "Dashboard 2.0") | 🟢 | **Shipped in Sprint 3** — team-wide (not yet per-user; see Core Engines note below). AI Sponsor Research, AI Daily Briefing, Notifications, Business Community, and Personal Performance sections remain out of scope (later sprints) — see `docs/00_Project/IMPLEMENTATION_MASTER_PLAN.md` Sprint 3 |
 | Company Workspace (redesigned) | ⚪ | Planned — blueprint complete, `docs/02_UX/Workspace_Azienda.md` |
 | Opportunity Workspace (redesigned) | ⚪ | Planned — blueprint complete, `docs/02_UX/Workspace_Trattativa.md` |
 | Contact Workspace (redesigned) | ⚪ | Planned — not yet designed |
@@ -104,7 +104,7 @@ old legend, `FEATURE_REGISTRY.md`'s old legend, and `01_Product/Features.md`'s p
 | Scoring Engine | 🟢 | Shipped — `Scoring.gs` |
 | Pipeline Engine | 🟢 | Shipped — `Pipeline.gs` |
 | Outreach Engine | 🟢 | Shipped — `Outreach.gs` |
-| Activity Engine | 🟡 | Built (Unwired) — **corrected in v1.1**, was incorrectly marked Shipped |
+| Activity Engine | 🟢 | **Shipped as of Sprint 3** — `logActivity_`/`getActivityTimeline_` now have live callers in the Dashboard (Today's Agenda, Recent Activities, "+ Nuova Attivita"). `Activity.gs` itself was not modified. |
 | Ownership Engine | 🟡 | Built (Unwired) |
 | Permission Engine | 🟡 | Built (Unwired), enforcement disabled — **corrected in v1.1**, was incorrectly marked Shipped |
 | Migration Engine | 🟡 | Built (Unwired) — **corrected in v1.1**, was incorrectly marked Shipped; `Migration.gs`'s functions are manual-only and have never been run against live data, see `docs/04_Business_Rules/Permissions.md` Section 6 |
@@ -139,16 +139,19 @@ old legend, `FEATURE_REGISTRY.md`'s old legend, and `01_Product/Features.md`'s p
 
 ## Objective
 
-No sprint has started implementation work yet. This entry reflects the phase transition only — see
-`docs/00_Project/IMPLEMENTATION_MASTER_PLAN.md` for the sprint-by-sprint roadmap that now governs
-how implementation proceeds.
+Sprint 3 (Dashboard 2.0) is complete. See
+`Dashboard_AppsScript/README_Dashboard_AppsScript.txt`-style completion report delivered with the
+sprint for full detail.
 
 ### Current Focus
 
-- Blueprint v1.1 is approved and frozen as the implementation baseline (documentation-only change,
-  no code or UI modified).
-- `docs/00_Project/IMPLEMENTATION_MASTER_PLAN.md` has been produced as the operational roadmap.
-- Next sprint to begin: **Sprint 3 — Dashboard 2.0** (not yet started).
+- **Sprint 3 — Dashboard 2.0: complete.** Team-wide KPIs, Today's Agenda, Follow-up Center, Open
+  Opportunities table, Contact Directory, sample Upcoming Matches, Recent Activities, and an "AI
+  Assistant — Coming Soon" placeholder are live on the Overview tab. Global Search and three quick
+  actions ("+ Nuova Azienda/Opportunita", "+ Nuova Attivita") added to the shared header. All three
+  quick actions route through the existing compliant flows (`addSingleLead`, `logActivity_`) — no
+  direct creation path was introduced.
+- Next sprint: **Sprint 4 — Company Workspace** (not yet started).
 
 ---
 
@@ -173,8 +176,14 @@ Implementation Master Plan produced; governance documents aligned — complete.
 
 ## Milestone 3 — Implementation Begins
 
-Sprint 3 (Dashboard 2.0) — not yet started. See
-`docs/00_Project/IMPLEMENTATION_MASTER_PLAN.md` Section 5.
+Sprint 3 (Dashboard 2.0) — complete. See `docs/00_Project/IMPLEMENTATION_MASTER_PLAN.md` Section 5
+and `docs/00_Project/CHANGELOG.md` for the completion entry.
+
+---
+
+## Milestone 4 — Sprint 4
+
+Sprint 4 (Company Workspace) — not yet started.
 
 ---
 
@@ -216,7 +225,7 @@ The project will be considered successful when:
 
 # Last Updated
 
-**July 2026 — Blueprint v1.1 Approved, Implementation Phase opened**
+**July 2026 — Sprint 3 (Dashboard 2.0) complete**
 
-Next review scheduled at the end of Sprint 3 (Dashboard 2.0), per
+Next review scheduled at the end of Sprint 4 (Company Workspace), per
 `docs/00_Project/IMPLEMENTATION_MASTER_PLAN.md`.
