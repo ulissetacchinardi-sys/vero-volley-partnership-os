@@ -139,9 +139,8 @@ old legend, `FEATURE_REGISTRY.md`'s old legend, and `01_Product/Features.md`'s p
 
 ## Objective
 
-Sprint 3 (Dashboard 2.0) is complete. See
-`Dashboard_AppsScript/README_Dashboard_AppsScript.txt`-style completion report delivered with the
-sprint for full detail.
+Sprint 3 (Dashboard 2.0) is complete. Full completion report:
+`docs/07_Releases/Sprint_03.md`.
 
 ### Current Focus
 
@@ -150,7 +149,7 @@ sprint for full detail.
   Assistant — Coming Soon" placeholder are live on the Overview tab. Global Search and three quick
   actions ("+ Nuova Azienda/Opportunita", "+ Nuova Attivita") added to the shared header. All three
   quick actions route through the existing compliant flows (`addSingleLead`, `logActivity_`) — no
-  direct creation path was introduced.
+  direct creation path was introduced. Full detail: `docs/07_Releases/Sprint_03.md`.
 - Next sprint: **Sprint 4 — Company Workspace** (not yet started).
 
 ---

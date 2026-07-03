@@ -85,6 +85,10 @@ Impact:
 Activity Engine both move from Planned/Built-Unwired to Shipped. Next sprint: Sprint 4 — Company
 Workspace.
 
+Detailed implementation report:
+
+docs/07_Releases/Sprint_03.md
+
 ---
 
 ### 🚀 Blueprint v1.1 Approved
